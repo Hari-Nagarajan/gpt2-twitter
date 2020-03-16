@@ -16,17 +16,22 @@ pipenv install
 
 ### Scrape Tweets
 ```
-python src/tweets.py
+Usage: twirclejerk.py scrape [OPTIONS] USERNAME
 ```
 
 
 ### Train model with your scraped tweets
 ```
-python src/model.py
+Usage: twirclejerk.py train [OPTIONS] USERNAME
+
+Options:
+  --base_model TEXT  Base model to use
+  --help             Show this message and exit.
+
 ```
 
 
-### Generate and post a new tweet
+### Generate a tweet
 ```
-python src/generate.py
+Usage: twirclejerk.py generate [OPTIONS] USERNAME
 ```

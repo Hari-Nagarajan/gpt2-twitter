@@ -12,6 +12,8 @@ gpt-2-simple = "*"
 tensorflow-gpu = "==1.15"
 pandas = "*"
 tweepy = "*"
+boto3 = "*"
+click = "*"
 
 [requires]
 python_version = "3.7"

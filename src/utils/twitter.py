@@ -9,6 +9,11 @@ import os
 import json
 import sys
 from pathlib import Path
+from os.path import isfile, join
+
+import pandas as pd
+import csv
+import glob
 
 # Surpress random twint warnings
 logger = logging.getLogger()
@@ -35,15 +40,9 @@ def is_reply(tweet):
     return False
 
 
-def update_resume_file(tweet_id):
-    """
-    Writes the latest tweet id to a temp file so the scrape can resume.
-    """
-    with open(".temp", "w", encoding="utf-8") as f:
-        f.write(str(tweet_id))
-
-
-def download_tweets(username=None, strip_usertags=False, strip_hashtags=False):
+def download_tweets(
+    username=None, tweet_path=None, strip_usertags=False, strip_hashtags=False
+):
     """Download public Tweets from a given Twitter account
     into a format suitable for training with AI text generation tools.
     :param username: Twitter @ username to gather tweets.
@@ -54,6 +53,7 @@ def download_tweets(username=None, strip_usertags=False, strip_hashtags=False):
     """
 
     assert username, "You must specify a username to download tweets from."
+    assert tweet_path, "You must specify a path to download to."
 
     pattern = r"http\S+|pic\.\S+|\xa0|…"
 
@@ -63,9 +63,7 @@ def download_tweets(username=None, strip_usertags=False, strip_hashtags=False):
     if strip_hashtags:
         pattern += r"|#[a-zA-Z0-9_]+"
 
-    update_resume_file(-1)
-
-    filename = f"tweets/{username}_tweets.csv"
+    filename = f"{tweet_path}/{username}_tweets.csv"
     file_exists = os.path.isfile(filename)
 
     with open(filename, "a", encoding="utf8", newline="") as f:
@@ -81,10 +79,11 @@ def download_tweets(username=None, strip_usertags=False, strip_hashtags=False):
         c_lookup.Hide_output = True
         if datetime.now().date() > last_modified:
             c_lookup.Since = last_modified.strftime("%Y-%m-%d")
+        else:
+            c_lookup.Since = "2018-01-01"
 
         twint.run.Lookup(c_lookup)
-        limit = twint.output.users_list[-1].tweets
-        print(f"Retrieving up to {limit} tweets for @{username}...")
+        limit = min(twint.output.users_list[-1].tweets, 10000)
 
         for i in range((limit // 20) - 1):
             tweet_data = []
@@ -103,9 +102,10 @@ def download_tweets(username=None, strip_usertags=False, strip_hashtags=False):
                     c.Videos = False
                     c.Images = False
                     c.Links = "exclude"
-                    c.Resume = ".temp"
                     if datetime.now().date() > last_modified:
                         c.Since = last_modified.strftime("%Y-%m-%d")
+                    else:
+                        c.Since = "2018-01-01"
 
                     c.Store_object_tweets_list = tweet_data
 
@@ -124,16 +124,50 @@ def download_tweets(username=None, strip_usertags=False, strip_hashtags=False):
             if i > 0:
                 tweet_data = tweet_data[20:]
 
-            tweets = [re.sub(pattern, "", tweet.tweet).strip() for tweet in tweet_data if not is_reply(tweet)]
+            tweets = [
+                re.sub(pattern, "", tweet.tweet).strip()
+                for tweet in tweet_data
+                if not is_reply(tweet)
+            ]
 
             for tweet in tweets:
                 if tweet != "" and len(tweet) > 20 and "/" not in tweet:
-                    w.writerow({"tweets": tweet.strip().encode("utf-8", errors="ignore").decode("utf-8", errors="replace")})
+                    w.writerow(
+                        {
+                            "tweets": tweet.strip()
+                            .encode("utf-8", errors="ignore")
+                            .decode("utf-8", errors="replace")
+                        }
+                    )
     os.remove(".temp")
 
 
-if __name__ == "__main__":
-    with open("config/accounts.json", "r") as accounts_file:
-        accounts = json.load(accounts_file)
-        for account in accounts["accounts"]:
-            download_tweets(username=account)
+def get_follows(username=None):
+    assert username, "You must specify a username to download tweets from."
+
+    c = twint.Config()
+    c.Username = username
+    c.Store_object = True
+
+    twint.run.Following(c)
+    return twint.output.follows_list
+
+
+def scrape_all_follows(username=None):
+
+    assert username, "You must specify a username to download tweets from."
+    tweet_path = f"{username}/tweets"
+    if not os.path.exists(tweet_path):
+        os.makedirs(tweet_path)
+
+    accounts = get_follows(username="HariRVA")
+    for account in accounts:
+        download_tweets(username=account, tweet_path=tweet_path)
+
+    csv_files = glob.glob(os.path.join(tweet_path, "*.csv"))
+
+    tweet_sets = [f for f in csv_files if isfile(f)]
+    combined_csv = pd.concat([pd.read_csv(f) for f in tweet_sets])
+    combined_csv.to_csv(
+        f"{username}/{username}_combined.csv", index=False, encoding="utf-8"
+    )
