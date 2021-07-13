@@ -62,7 +62,7 @@ def is_not_in_blacklist(tweet):
     return True
 
 
-def generate_tweets(sess):
+def generate_tweets(sess, username):
     """
     Generates a tweet, if the tweet is invalid (blacklist or length) then it just tries again
     """
@@ -78,8 +78,10 @@ def generate_tweets(sess):
         top_k=40,
         top_p=0.7,
         return_as_list=True,
-        nsamples=80,
+        nsamples=100,
         batch_size=20,
+        checkpoint_dir=f"{username}_checkpoint",
+        run_name=username,
     )
     viable_tweets = []
     for tweet in tweets:

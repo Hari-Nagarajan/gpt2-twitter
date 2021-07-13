@@ -9,7 +9,6 @@ verify_ssl = true
 twint = "*"
 tqdm = "*"
 gpt-2-simple = "*"
-tensorflow-gpu = "==1.15"
 pandas = "*"
 tweepy = "*"
 boto3 = "*"

@@ -55,7 +55,7 @@ def generate_to_sqs(username):
     sess = load_model(username=username)
 
     for x in range(100):
-        tweets = generate_tweets(sess)
+        tweets = generate_tweets(sess, username)
         click.echo(f"Got {len(tweets)} more tweets!")
         for tweet in tweets:
             send_to_queue(queue, tweet)
